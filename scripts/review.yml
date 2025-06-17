@@ -1,0 +1,62 @@
+description: "Rules for detecting AI-generated code and evaluating comment quality and grammar"
+
+rules:
+  - name: high_ai_confidence
+    when: ai_prob > 0.8
+    severity: error
+    message: >
+      Code appears to be AI-generated with high confidence (>80%).
+      Please add appropriate attribution or license information.
+
+  - name: medium_ai_confidence
+    when: ai_prob > 0.6 && !license_comment
+    severity: error
+    message: >
+      Code appears to be AI-generated with medium confidence (>60%).
+      No license or attribution information was found.
+      Please add appropriate attribution or license information.
+
+  - name: likely_ai_generated
+    when: ai_prob > 0.4 && !license_comment
+    severity: warning
+    message: >
+      Code may be AI-generated (>40% confidence).
+      Consider adding appropriate attribution or license information.
+
+  - name: poor_comment_quality
+    when: ai_prob > 0.5
+    severity: warning
+    message: >
+      The code appears to contain low-quality comments that don't adequately explain 
+      the purpose and functionality of complex sections. Good comments should explain 
+      "why" rather than just "what" the code is doing.
+
+  - name: grammar_issues
+    when: ai_prob > 0.3
+    severity: warning
+    message: >
+      Grammar and spelling issues detected in comments and documentation.
+      Clear, well-written comments improve code maintainability and readability.
+      Consider reviewing for proper grammar, spelling, and punctuation.
+
+  - name: missing_context
+    when: ai_prob > 0.4 && lines_added > 100
+    severity: warning
+    message: >
+      Substantial code additions lack sufficient contextual documentation.
+      Add high-level explanations of component purposes, architectural decisions,
+      and the reasoning behind implementation choices.
+
+  - name: missing_tests
+    when: ai_prob > 0.5 && !tests_changed && lines_added > 50
+    severity: warning
+    message: >
+      Substantial code additions appear to be AI-generated,
+      but no test files were modified. Please add appropriate tests.
+
+  - name: excessive_code
+    when: lines_added > 300 && ai_prob > 0.5
+    severity: warning
+    message: >
+      Large code submission appears to be AI-generated.
+      Consider breaking into smaller, more focused pull requests.

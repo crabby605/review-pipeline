@@ -1,0 +1,19 @@
+{
+  "name": "review-pipeline",
+  "version": "1.0.0",
+  "description": "AI code review pipeline",
+  "main": "scripts/index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "analyze-repo": "node scripts/repo-analysis.js",
+    "review-pr": "node scripts/index.js"
+  },
+  "dependencies": {
+    "@octokit/core": "^7.0.2",
+    "axios": "^1.10.0",
+    "js-yaml": "^4.1.0",
+    "openai": "^5.5.0"
+  },
+  "private": true
+}
