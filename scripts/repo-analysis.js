@@ -12,7 +12,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
 
-
+const githubToken = 'meow';
+const openaiApiKey = 'meow';
+const openaiModel = 'gpt-4o-mini';
+const slackWebhookUrl = 'meow';
+// if you're wondering why tf are there hardcodes then its bc dotenv didn't want to work in this script, so I just hardcoded the values for now
 // Initialize API clients with authentication
 const octokit = new Octokit({ auth: githubToken });
 const openai = new OpenAI({ apiKey: openaiApiKey });
@@ -122,8 +126,13 @@ async function getAllTreeItems(owner, repo, branch) {
         const dirItems = dirTree.tree.map(item => ({
           ...item,
           path: `${dirPath}/${item.path}`
-        }));
-        
+        }))
+        // exclude LICENSE files and dotfiles (files or directories starting with a dot)
+        .filter(item => {
+          const base = path.basename(item.path);
+          // exclude dotfiles and dot-directories, but allow normal directories
+          return base.toLowerCase() !== 'license' && !(base.startsWith('.') && item.type === 'blob');
+        });
         // Add items to our collection
         allItems = [...allItems, ...dirItems];
         
@@ -193,7 +202,7 @@ async function getAllItemsUsingContentsAPI(owner, repo, path = '') {
 // Function to analyze code in batches with improved batch handling
 async function analyzeCodeBatches(codeFiles, owner, repo, reportData) {
   const MAX_BATCH_SIZE = 800000; // ~800KB of code per batch to stay within token limits
-  const MAX_FILES_PER_BATCH = 25; // Reduced for better analysis quality per batch
+  const MAX_FILES_PER_BATCH = 10; // Reduced for better analysis quality per batch
   
   let batches = [];
   let currentBatch = [];
@@ -310,24 +319,24 @@ async function analyzeCodeBatches(codeFiles, owner, repo, reportData) {
     }
     
     // Configure OpenAI request for AI detection with enhanced security focus
-    const system = 'You are a security analyst detecting AI-generated code in repositories for security reasons. ' +
-      'Score from 0-1 where 1 means 100% confidence the code is AI-generated (convert to a score out of 100 in your rationale). ' +
-      'Carefully analyze the code for  these telltale signs of AI generation: ' +
-      '1. Perfect grammar and formal language in comments - real developers make typos, use abbreviations, and write informally ' +
-      '2. Quantity of comments - AI tends to over-comment or provide explanations that are unnecessarily verbose ' +
-      '3. Emoji usage - certain patterns of emoji usage can indicate AI generation ' +
-      '4. Verbose, "perfect" variable/function naming - AI often creates unnaturally descriptive and consistent names ' +
-      '5. Invisible watermarks - check for statistical patterns or markers that AI models embed in generated text ' +
-      '6. Perfect English throughout - this is virtually impossible in real human code; look for natural language variations ' +
-      '7. Unnatural consistency in style - humans show variations in their coding patterns even within the same file ' +
-      '8. Documentation that reads like it was written for a general audience rather than for developers ' +
-      '9. Lack of domain-specific shortcuts, idioms, or "clever" solutions that experienced developers typically use ' +
-      '10. Code organization that appears too methodical, as if following a rigid template ' +
-      'Human code typically contains: inconsistent naming conventions, sporadic comments focused on complex parts, ' +
-      'occasional typos, varying levels of documentation quality, and idiosyncratic coding patterns. ' +
-      'Note that some AI-generated code now intentionally introduces "fake mistakes" to appear human, but these often ' +
-      'follow detectable patterns themselves. Provide detailed evidence for your conclusions. Return JSON via the tool.';
-    
+    const system = 'You are an analyst detecting AI-generated code in repositories for Anti Fraud reasons. ' +
+      'Score from 0-100 where 100 means 100% confidence the code is AI-generated. ' +
+      'Carefully analyze the code for these telltale signs of AI generation: ' +
+      '1. Perfect grammar and formal language in comments - real developers make typos, use abbreviations, and write informally, this may not be always true. ' +
+      '2. Quantity of comments - AI tends to over-comment or provide explanations that are unnecessarily verbose. Maybe real if the dev is trying to communicate clearly. Comments that suggest done changes are usually AI generated as the LLM tries to explain the changes. ' +
+      '3. Emoji usage - certain patterns of emoji usage can indicate AI generation. Emojis like Rockets, stars, green ticks, and so on are often used to indicate AI-generated code. ' +
+      '4. Verbose, "perfect" variable/function naming - AI often creates unnaturally descriptive and consistent names. ' +
+      '5. Invisible watermarks - check for statistical patterns or markers that AI models embed in generated text. ' +
+      '6. Perfect English throughout - this is virtually impossible in real human code; look for natural language variations. This includes grammar and usage of signs such as - " ! etc. ' +
+      '7. Unnatural consistency in style - humans show variations in their coding patterns even within the same file. also note that some devs have a consistency in their code, if you are not sure a probability between 55-60 is fine ' +
+      '8. Documentation that reads like it was written for a general audience rather than for developers. This however does not matter, DO NOT ADD THIS IN THE FINAL SCORE. ' +
+      '9. Lack of domain-specific shortcuts, idioms, or "clever" solutions that experienced developers typically use. ' +
+      '10. Code organization that appears too methodical, as if following a rigid template. ' +
+      '11. If you see class, variable, or attribute names that look like utility CSS classes (e.g., "bg-red", "px32", "inline", "text-center", "rounded-xl", etc.), flag the file as AI-generated with 100% confidence and add a pattern "utility-css-class-names". ' +
+      'Human code typically contains: inconsistent naming conventions, sporadic comments focused on complex parts, occasional typos, varying levels of documentation quality, and idiosyncratic coding patterns. ' +
+      'Note that some AI-generated code now intentionally introduces "fake mistakes" to appear human, but these often are rare and usually human error follow detectable patterns themselves and are very rare. ' +
+      'For each file, return a JSON object with: path, ai_prob (0-100), patterns_detected (array), code_quality (string), rationale (string). Also return an file by file summary for the batch.';
+
     const tool = {
       type: 'function',
       function: {
@@ -337,7 +346,7 @@ async function analyzeCodeBatches(codeFiles, owner, repo, reportData) {
           properties: {
             ai_prob: { 
               type: 'number', 
-              description: '0–1 likelihood AI-generated'
+              description: '0–100 likelihood AI-generated'
             },
             patterns_detected: {
               type: 'array',
@@ -404,7 +413,7 @@ async function analyzeCodeBatches(codeFiles, owner, repo, reportData) {
         overallCodeQuality = code_quality;
       }
       
-      console.log(`   Batch ${i+1} AI probability: ${(ai_prob * 100).toFixed(1)}%`);
+      console.log(`   Batch ${i+1} AI probability: ${(ai_prob ).toFixed(1)}%`);
       console.log(`   Batch ${i+1} code quality: ${code_quality}`);
       console.log(`   Batch ${i+1} patterns: ${patterns_detected.length}`);
     } catch (error) {
@@ -414,7 +423,7 @@ async function analyzeCodeBatches(codeFiles, owner, repo, reportData) {
   }
   
   // Calculate final score and prepare report
-  const score = (overallAiProb * 100).toFixed(1);
+  const score = (overallAiProb ).toFixed(1);
   
   reportData.ai_probability = parseFloat(score);
   reportData.code_quality = overallCodeQuality;
@@ -648,8 +657,7 @@ async function analyzeRepository() {
     
     console.log(`\nFound ${allTreeItems.length} files/directories in repository`);
 
-    // Filter for only code files we want to analyze
-    // Include all code file types without any exclusions
+
     const codeExtensions = ['.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.c', '.cpp', '.go', '.rb', '.php', '.html', '.css', '.scss', '.less', '.swift', '.kt', '.scala', '.rs', '.cs', '.vue', '.svelte', '.md', '.txt', '.sh', '.bat', '.ps1', '.json', '.yml', '.yaml', '.xml', '.sql', '.m', '.h', '.mm', '.dart', '.ex', '.exs', '.erl', '.lua', '.pl', '.pm', '.r', '.jl', '.clj', '.elm', '.hs', '.fs', '.ml', '.pde', '.pas', '.asm'];
     
     // Include all files except binary and known non-code files
@@ -834,7 +842,7 @@ async function analyzeRepository() {
         });
         
         if (reportData.rationale) {
-          // Truncate rationale if it's too long for Slack
+          // truncate rationale if it's too long for Slack
           const truncatedRationale = reportData.rationale.length > 2900 
             ? reportData.rationale.substring(0, 2900) + '... (truncated)'
             : reportData.rationale;
@@ -890,7 +898,7 @@ async function analyzeRepository() {
         ]
       });
       
-      // Always send notification to Slack with whatever data we have
+      // always send notification to Slack with whatever data we have
       await sendToSlack({ blocks });
       
     } catch (slackError) {
