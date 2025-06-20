@@ -6,14 +6,16 @@
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "analyze-repo": "node scripts/repo-analysis.js",
+    "review-repo": "node scripts/repo-analysis.js",
     "review-pr": "node scripts/index.js"
   },
   "dependencies": {
+    "@octokit/auth-app": "^5.0.6",
     "@octokit/core": "^7.0.2",
+    "@octokit/rest": "^20.0.0",
     "axios": "^1.10.0",
     "js-yaml": "^4.1.0",
-    "openai": "^5.5.0"
+    "openai": "^5.5.1"
   },
   "private": true
 }
